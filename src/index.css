@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-black text-white antialiased selection:bg-white/20;
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Hide scrollbars for a cleaner PWA look */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.glass {
+  @apply bg-white/10 backdrop-blur-xl border border-white/10;
+}
+
+.glass-dark {
+  @apply bg-black/40 backdrop-blur-2xl border border-white/5;
+}
+
+.ios-shadow {
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+}
+
