@@ -3,32 +3,68 @@ import { Cake, Category, Store, Order, UserProfile } from '../types';
 
 export const supabaseService = {
   async getCategories(): Promise<Category[]> {
-    const { data, error } = await supabase.from('categories').select('*');
-    if (error) throw error;
-    console.log('Categorias do Banco:', data);
+    console.log('[v0] getCategories: starting fetch...');
+    const { data, error, status, statusText } = await supabase.from('categories').select('*');
+    if (error) {
+      console.error('[v0] getCategories FAILED:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        httpStatus: status,
+        httpStatusText: statusText,
+      });
+      throw error;
+    }
+    console.log('[v0] getCategories: HTTP', status, statusText, '| rows =', data?.length ?? 0);
     return data;
   },
 
   async getStores(): Promise<Store[]> {
-    const { data, error } = await supabase.from('stores').select('*');
-    if (error) throw error;
+    console.log('[v0] getStores: starting fetch...');
+    const { data, error, status, statusText } = await supabase.from('stores').select('*');
+    if (error) {
+      console.error('[v0] getStores FAILED:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        httpStatus: status,
+        httpStatusText: statusText,
+      });
+      throw error;
+    }
+    console.log('[v0] getStores: HTTP', status, statusText, '| rows =', data?.length ?? 0);
     return data;
   },
 
   async getProducts(): Promise<Cake[]> {
-    console.log('Iniciando busca global de produtos...');
-    // Fetching all products without store filter for testing
-    const { data, error } = await supabase
+    console.log('[v0] getProducts: starting fetch...');
+    const cacheBuster = `_cb=${Date.now()}`;
+    console.log('[v0] getProducts: cache buster =', cacheBuster);
+
+    const { data, error, status, statusText } = await supabase
       .from('products')
-      .select('*, categories(name)');
+      .select('*, categories(name)')
+      .order('created_at', { ascending: false });
     
     if (error) {
-      console.error('Erro ao buscar produtos:', error);
+      console.error('[v0] getProducts FAILED:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        httpStatus: status,
+        httpStatusText: statusText,
+      });
       throw error;
     }
 
-    console.log('Total de produtos encontrados:', data?.length || 0);
-    console.log('Produtos do Banco (Raw):', data);
+    console.log('[v0] getProducts: HTTP', status, statusText);
+    console.log('[v0] getProducts: total rows =', data?.length ?? 0);
+    if (data && data.length > 0) {
+      console.log('[v0] getProducts: first row sample =', JSON.stringify(data[0]).slice(0, 200));
+    }
 
     if (!data) return [];
 
