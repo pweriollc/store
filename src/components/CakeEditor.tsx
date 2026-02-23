@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Cake } from '../types';
+import { Cake, Store } from '../types';
 import { BottomDrawer } from './BottomDrawer';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Store as StoreIcon } from 'lucide-react';
+import { cn } from '../utils';
 
 interface CakeEditorProps {
   isOpen: boolean;
   onClose: () => void;
   cake: Cake | null;
+  stores: Store[];
   onSave: (cake: Cake) => void;
 }
 
-export function CakeEditor({ isOpen, onClose, cake, onSave }: CakeEditorProps) {
+export function CakeEditor({ isOpen, onClose, cake, stores, onSave }: CakeEditorProps) {
   const [formData, setFormData] = useState<Partial<Cake>>({});
 
   useEffect(() => {
@@ -21,6 +23,17 @@ export function CakeEditor({ isOpen, onClose, cake, onSave }: CakeEditorProps) {
       });
     }
   }, [cake]);
+
+  const toggleStore = (storeId: string) => {
+    const current = formData.outOfStockStores || [];
+    const isOut = current.includes(storeId);
+    setFormData({
+      ...formData,
+      outOfStockStores: isOut 
+        ? current.filter(id => id !== storeId)
+        : [...current, storeId]
+    });
+  };
 
   const handleSave = () => {
     if (cake && formData.name) {
@@ -137,6 +150,36 @@ export function CakeEditor({ isOpen, onClose, cake, onSave }: CakeEditorProps) {
                 className="w-full glass bg-white/5 rounded-2xl py-4 px-6 text-sm focus:outline-none focus:ring-2 ring-white/20"
               />
             </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-xs font-bold text-white/40 uppercase tracking-widest px-1">Availability</h3>
+          <div className="grid grid-cols-1 gap-2">
+            {stores.map((store) => {
+              const isOut = formData.outOfStockStores?.includes(store.id);
+              return (
+                <button
+                  key={store.id}
+                  onClick={() => toggleStore(store.id)}
+                  className={cn(
+                    "glass p-4 rounded-2xl flex items-center justify-between transition-all",
+                    isOut ? "opacity-40 grayscale" : "opacity-100 ring-1 ring-white/10"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <StoreIcon size={18} className="text-white/40" />
+                    <span className="text-sm font-medium">{store.name}</span>
+                  </div>
+                  <div className={cn(
+                    "px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-tighter",
+                    isOut ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400"
+                  )}>
+                    {isOut ? "Out of Stock" : "Available"}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Package, 
   Tag, 
@@ -8,21 +8,27 @@ import {
   AlertCircle,
   Globe,
   Trash2,
-  Check
+  Check,
+  Layers,
+  History,
+  Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Cake, Coupon, WalletTier, AdminConfig } from '../types';
+import { Cake, Coupon, WalletTier, AdminConfig, Category, Store, Order, UserProfile } from '../types';
 import { cn, formatCurrency } from '../utils';
-import { STORES } from '../constants';
+import { supabaseService } from '../services/supabaseService';
 import { CakeEditor } from './CakeEditor';
 import { PromoEditor } from './PromoEditor';
 import { BottomDrawer } from './BottomDrawer';
 
 interface AdminViewProps {
   cakes: Cake[];
+  categories: Category[];
+  stores: Store[];
   coupons: Coupon[];
   walletTiers: WalletTier[];
   config: AdminConfig;
+  profile: UserProfile;
   onUpdateCake: (cake: Cake) => void;
   onUpdateCoupon: (coupon: Coupon) => void;
   onDeleteCoupon: (id: string) => void;
@@ -30,28 +36,48 @@ interface AdminViewProps {
   onUpdateWalletTier: (tier: WalletTier) => void;
   onToggleStock: (cakeId: string, storeId: string) => void;
   onUpdateConfig: (config: AdminConfig) => void;
+  onUpdateProfile: (profile: UserProfile) => void;
 }
 
-type AdminTab = 'inventory' | 'promotions' | 'stores' | 'integrations';
+type AdminTab = 'inventory' | 'categories' | 'stores' | 'promotions' | 'sales' | 'loyalty' | 'integrations';
 
 export function AdminView({ 
   cakes, 
+  categories,
+  stores,
   coupons, 
   walletTiers, 
   config,
+  profile,
   onUpdateCake, 
   onUpdateCoupon, 
   onDeleteCoupon,
   onAddCoupon,
   onUpdateWalletTier,
   onToggleStock,
-  onUpdateConfig
+  onUpdateConfig,
+  onUpdateProfile
 }: AdminViewProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('inventory');
   const [editingCake, setEditingCake] = useState<Cake | null>(null);
   const [editingTier, setEditingTier] = useState<WalletTier | null>(null);
   const [isAddingCoupon, setIsAddingCoupon] = useState(false);
   const [newCoupon, setNewCoupon] = useState<Partial<Coupon>>({ type: 'percentage', discount: 0, code: '' });
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    if (activeTab === 'sales') {
+      const fetchOrders = async () => {
+        try {
+          const { data } = await supabaseService.getOrders();
+          setOrders(data || []);
+        } catch (e) {
+          console.error('Error fetching orders:', e);
+        }
+      };
+      fetchOrders();
+    }
+  }, [activeTab]);
 
   const handleAddCoupon = () => {
     if (newCoupon.code && newCoupon.discount) {
@@ -80,8 +106,11 @@ export function AdminView({
       <div className="flex gap-2 p-1 glass rounded-2xl overflow-x-auto no-scrollbar">
         {[
           { id: 'inventory', icon: Package, label: 'Items' },
-          { id: 'promotions', icon: Tag, label: 'Promos' },
+          { id: 'categories', icon: Layers, label: 'Cats' },
           { id: 'stores', icon: StoreIcon, label: 'Stores' },
+          { id: 'promotions', icon: Tag, label: 'Promos' },
+          { id: 'sales', icon: History, label: 'Sales' },
+          { id: 'loyalty', icon: Award, label: 'Loyalty' },
           { id: 'integrations', icon: Globe, label: 'Webhooks' },
         ].map((tab) => (
           <button
@@ -210,6 +239,41 @@ export function AdminView({
           </motion.div>
         )}
 
+        {activeTab === 'categories' && (
+          <motion.div
+            key="categories"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-4"
+          >
+            <div className="flex items-center justify-between px-2">
+              <h3 className="font-semibold">Categories</h3>
+              <button className="p-2 bg-white text-black rounded-lg hover:bg-white/90">
+                <Plus size={18} />
+              </button>
+            </div>
+            <div className="grid gap-3">
+              {categories.map((cat) => (
+                <div key={cat.id} className="glass p-4 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <div className="font-bold">{cat.name}</div>
+                    <div className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Slug: {cat.slug}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                      <Edit2 size={16} className="text-white/60" />
+                    </button>
+                    <button className="p-2 hover:bg-red-500/10 rounded-lg transition-colors group">
+                      <Trash2 size={16} className="text-white/40 group-hover:text-red-400" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'stores' && (
           <motion.div
             key="stores"
@@ -218,47 +282,159 @@ export function AdminView({
             exit={{ opacity: 0, y: -10 }}
             className="space-y-6"
           >
-            <div className="bg-white/5 p-4 rounded-2xl flex items-start gap-3">
-              <AlertCircle size={20} className="text-white/40 shrink-0 mt-0.5" />
-              <p className="text-xs text-white/60 leading-relaxed">
-                Manage stock availability per location. Marking an item as "Out of Stock" will hide it from the catalog for that specific store.
-              </p>
+            <div className="flex items-center justify-between px-2">
+              <h3 className="font-semibold">Stores</h3>
+              <button className="p-2 bg-white text-black rounded-lg hover:bg-white/90">
+                <Plus size={18} />
+              </button>
             </div>
 
-            {STORES.map((store) => (
-              <div key={store.id} className="space-y-3">
-                <h4 className="font-bold text-sm px-2 flex items-center gap-2">
-                  <StoreIcon size={14} className="text-white/40" />
-                  {store.name}
-                </h4>
-                <div className="grid gap-2">
-                  {cakes.map((cake) => {
-                    const isOut = cake.outOfStockStores.includes(store.id);
-                    return (
-                      <button
-                        key={cake.id}
-                        onClick={() => onToggleStock(cake.id, store.id)}
-                        className={cn(
-                          "glass p-3 rounded-xl flex items-center justify-between transition-all",
-                          isOut ? "opacity-40 grayscale" : "opacity-100"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <img src={cake.image} className="w-8 h-8 rounded-lg object-cover" />
-                          <span className="text-xs font-medium">{cake.name}</span>
-                        </div>
-                        <div className={cn(
-                          "px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-tighter",
-                          isOut ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400"
-                        )}>
-                          {isOut ? "Out of Stock" : "In Stock"}
-                        </div>
+            <div className="grid gap-3">
+              {stores.map((store) => (
+                <div key={store.id} className="glass p-4 rounded-2xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-white/10 p-2 rounded-xl">
+                        <StoreIcon size={18} className="text-white" />
+                      </div>
+                      <div>
+                        <div className="font-bold">{store.name}</div>
+                        <div className="text-[10px] text-white/40 uppercase font-bold tracking-widest">{store.address}</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                        <Edit2 size={16} className="text-white/60" />
                       </button>
-                    );
-                  })}
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-white/5">
+                    <h4 className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-3">Inventory Status</h4>
+                    <div className="grid gap-2">
+                      {cakes.map((cake) => {
+                        const isOut = cake.outOfStockStores.includes(store.id);
+                        return (
+                          <button
+                            key={cake.id}
+                            onClick={() => onToggleStock(cake.id, store.id)}
+                            className={cn(
+                              "glass p-3 rounded-xl flex items-center justify-between transition-all",
+                              isOut ? "opacity-40 grayscale" : "opacity-100"
+                            )}
+                          >
+                            <div className="flex items-center gap-3">
+                              <img src={cake.image} className="w-8 h-8 rounded-lg object-cover" />
+                              <span className="text-xs font-medium">{cake.name}</span>
+                            </div>
+                            <div className={cn(
+                              "px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-tighter",
+                              isOut ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400"
+                            )}>
+                              {isOut ? "Out of Stock" : "In Stock"}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'sales' && (
+          <motion.div
+            key="sales"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-4"
+          >
+            <div className="flex items-center justify-between px-2">
+              <h3 className="font-semibold">Sales History</h3>
+              <div className="text-[10px] text-white/40 uppercase font-bold tracking-widest">
+                Total Orders: {orders.length}
+              </div>
+            </div>
+            <div className="grid gap-3">
+              {orders.map((order) => (
+                <div key={order.id} className="glass p-4 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="font-mono font-bold text-sm">#{order.id}</div>
+                    <div className={cn(
+                      "px-2 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest",
+                      order.status === 'completed' ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"
+                    )}>
+                      {order.status}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="text-white/60">{new Date(order.created_at).toLocaleString()}</div>
+                    <div className="font-bold">{formatCurrency(order.total_cents / 100)}</div>
+                  </div>
+                  <div className="pt-2 border-t border-white/5">
+                    <div className="text-[10px] text-white/20 uppercase font-bold tracking-widest">Customer</div>
+                    <div className="text-sm font-medium">{(order as any).user_profiles?.name || 'Anonymous'}</div>
+                  </div>
+                </div>
+              ))}
+              {orders.length === 0 && (
+                <div className="text-center py-12 text-white/20">
+                  <History size={48} className="mx-auto mb-4 opacity-20" />
+                  <p>No orders found yet.</p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'loyalty' && (
+          <motion.div
+            key="loyalty"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-6"
+          >
+            <div className="glass p-6 rounded-3xl space-y-6">
+              <div className="flex items-center gap-3 text-white/60">
+                <Award size={24} className="text-white/40" />
+                <div>
+                  <h3 className="font-bold">Loyalty Program</h3>
+                  <p className="text-xs">Configure how points are earned</p>
                 </div>
               </div>
-            ))}
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-white/20 uppercase tracking-widest px-1">Points per R$ 1.00</label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="number"
+                      value={profile.loyalty_ratio}
+                      onChange={(e) => onUpdateProfile({ ...profile, loyalty_ratio: parseFloat(e.target.value) })}
+                      className="flex-1 glass bg-white/5 rounded-2xl py-4 px-6 text-sm focus:outline-none focus:ring-2 ring-white/20"
+                    />
+                    <div className="text-xs text-white/40 font-bold uppercase tracking-widest">Points</div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white/5 rounded-2xl">
+                  <p className="text-[10px] text-white/40 leading-relaxed">
+                    Example: If set to 1, a R$ 50.00 purchase earns 50 points. If set to 2, it earns 100 points.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => alert('Loyalty settings saved!')}
+                  className="w-full bg-white text-black py-4 rounded-2xl font-bold hover:bg-white/90 transition-all active:scale-95"
+                >
+                  Save Settings
+                </button>
+              </div>
+            </div>
           </motion.div>
         )}
 
@@ -311,6 +487,7 @@ export function AdminView({
         isOpen={!!editingCake} 
         onClose={() => setEditingCake(null)} 
         cake={editingCake} 
+        stores={stores}
         onSave={onUpdateCake} 
       />
 

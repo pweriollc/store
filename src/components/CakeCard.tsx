@@ -1,7 +1,7 @@
 import React from 'react';
 import { Cake } from '../types';
-import { Plus } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Plus, ShoppingCart } from 'lucide-react';
+import { motion, useAnimation } from 'motion/react';
 import { cn, formatCurrency } from '../utils';
 
 interface CakeCardProps {
@@ -13,6 +13,22 @@ interface CakeCardProps {
 export function CakeCard({ cake, onAdd, isOutOfStock }: CakeCardProps) {
   const hasSale = cake.salePriceSlice || cake.salePriceWhole;
   const isLowStock = cake.stockCount > 0 && cake.stockCount <= 5;
+  const controls = useAnimation();
+
+  const handleAdd = async (type: 'whole' | 'slice') => {
+    onAdd(type);
+    // Glow effect animation
+    await controls.start({
+      boxShadow: "0 0 20px 5px rgba(255, 255, 255, 0.8)",
+      scale: 1.05,
+      transition: { duration: 0.1 }
+    });
+    await controls.start({
+      boxShadow: "0 0 0px 0px rgba(255, 255, 255, 0)",
+      scale: 1,
+      transition: { duration: 0.2 }
+    });
+  };
 
   return (
     <motion.div
@@ -57,7 +73,7 @@ export function CakeCard({ cake, onAdd, isOutOfStock }: CakeCardProps) {
         {!(isOutOfStock || cake.stockCount === 0) && (
           <div className="space-y-2">
             <button
-              onClick={() => onAdd('slice')}
+              onClick={() => handleAdd('slice')}
               className="w-full flex items-center justify-between glass hover:bg-white/20 px-3 py-2 rounded-xl transition-colors group/btn"
             >
               <div className="flex flex-col items-start">
@@ -73,13 +89,16 @@ export function CakeCard({ cake, onAdd, isOutOfStock }: CakeCardProps) {
                   )}
                 </div>
               </div>
-              <div className="bg-white text-black p-1 rounded-lg group-hover/btn:scale-110 transition-transform">
+              <motion.div 
+                animate={controls}
+                className="bg-white text-black p-1 rounded-lg group-hover/btn:scale-110 transition-transform"
+              >
                 <Plus size={16} />
-              </div>
+              </motion.div>
             </button>
 
             <button
-              onClick={() => onAdd('whole')}
+              onClick={() => handleAdd('whole')}
               className="w-full flex items-center justify-between bg-white text-black hover:bg-white/90 px-3 py-2 rounded-xl transition-colors group/btn"
             >
               <div className="flex flex-col items-start">
@@ -95,9 +114,12 @@ export function CakeCard({ cake, onAdd, isOutOfStock }: CakeCardProps) {
                   )}
                 </div>
               </div>
-              <div className="bg-black text-white p-1 rounded-lg group-hover/btn:scale-110 transition-transform">
+              <motion.div 
+                animate={controls}
+                className="bg-black text-white p-1 rounded-lg group-hover/btn:scale-110 transition-transform"
+              >
                 <Plus size={16} />
-              </div>
+              </motion.div>
             </button>
           </div>
         )}

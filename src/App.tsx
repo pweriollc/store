@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -8,41 +8,86 @@ import { LoyaltyView } from './components/LoyaltyView';
 import { CartDrawer } from './components/CartDrawer';
 import { SuccessView } from './components/SuccessView';
 import { AdminView } from './components/AdminView';
-import { SettingsView } from './components/SettingsView';
+import { ProfileDrawer } from './components/ProfileDrawer';
 import { useCart } from './hooks/useCart';
 import { useWallet } from './hooks/useWallet';
 import { useLoyalty } from './hooks/useLoyalty';
 import { 
-  CAKES as INITIAL_CAKES, 
-  STORES, 
+  STORES as STATIC_STORES, 
   INITIAL_COUPONS, 
   INITIAL_PAYMENT_METHODS, 
   INITIAL_WALLET_TIERS,
-  CATEGORIES
 } from './constants';
-import { View, Store, Cake, Coupon, WalletTier, UserProfile, AdminConfig } from './types';
+import { View, Store, Cake, Coupon, WalletTier, UserProfile, AdminConfig, Category } from './types';
 import { cn, formatCurrency } from './utils';
 import { supabase } from './lib/supabase';
+import { supabaseService } from './services/supabaseService';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('catalog');
-  const [selectedStore, setSelectedStore] = useState<Store>(STORES[0]);
+  const [selectedStore, setSelectedStore] = useState<Store>(STATIC_STORES[0]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
 
   // Admin Managed State
-  const [cakes, setCakes] = useState<Cake[]>(INITIAL_CAKES);
+  const [cakes, setCakes] = useState<Cake[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [stores, setStores] = useState<Store[]>(STATIC_STORES);
   const [coupons, setCoupons] = useState<Coupon[]>(INITIAL_COUPONS);
   const [walletTiers, setWalletTiers] = useState<WalletTier[]>(INITIAL_WALLET_TIERS);
   const [paymentMethods] = useState(INITIAL_PAYMENT_METHODS);
   const [adminConfig, setAdminConfig] = useState<AdminConfig>({ webhookUrl: '' });
   const [profile, setProfile] = useState<UserProfile>({
-    id: 'user_123',
-    name: 'Alex Johnson',
-    email: 'alex.j@example.com',
+    id: '6903ddff-f8b5-4aaa-8da3-8fcba142b27d', // Admin ID
+    name: 'Eduardo Nascimento',
+    email: 'eduardo@voalzira.com',
     address: 'Rua das Flores, 123 - Apt 402, Rio de Janeiro',
-    whatsapp: '+55 21 99887-7665'
+    whatsapp: '+55 21 99887-7665',
+    points: 1250,
+    loyalty_ratio: 1,
+    wallet_balance_cents: 15000
   });
+
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [fetchedCakes, fetchedCategories, fetchedStores, fetchedProfile] = await Promise.all([
+          supabaseService.getProducts(),
+          supabaseService.getCategories(),
+          supabaseService.getStores(),
+          supabaseService.getProfile('6903ddff-f8b5-4aaa-8da3-8fcba142b27d') // Using the admin ID from request
+        ]);
+        
+        setCakes(fetchedCakes);
+        setCategories(fetchedCategories);
+        setProfile(fetchedProfile);
+        if (fetchedStores.length > 0) {
+          setStores(fetchedStores);
+          setSelectedStore(fetchedStores[0]);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handleUpdateCake = async (updated: Cake) => {
+    try {
+      await supabaseService.updateProduct(updated, stores.map(s => s.id));
+      setCakes(prev => prev.map(c => c.id === updated.id ? updated : c));
+    } catch (error) {
+      console.error('Failed to update product:', error);
+      alert('Failed to update product. Please try again.');
+    }
+  };
 
   const {
     items,
@@ -56,7 +101,7 @@ export default function App() {
     applyCoupon,
   } = useCart(coupons, cakes);
 
-  const { balance, topUp, pay } = useWallet();
+  const { balance, topUp, pay } = useWallet(profile.wallet_balance_cents / 100);
   const { stamps, points, addPoints } = useLoyalty();
 
   const handleCheckout = async (method: 'wallet' | 'pix' | 'whatsapp') => {
@@ -82,50 +127,51 @@ export default function App() {
       return;
     }
 
-    if (method === 'wallet') {
-      // Supabase RPC call as requested
-      const { data, error } = await supabase.rpc('process_wallet_payment', {
-        p_user_id: profile.id,
-        p_amount_cents: Math.round(total * 100),
-        p_order_id: newOrderId,
-        p_idempotency_key: `idemp_${newOrderId}`
+    try {
+      if (method === 'wallet') {
+        const { error } = await supabase.rpc('process_wallet_payment', {
+          p_user_id: profile.id,
+          p_amount_cents: Math.round(total * 100),
+          p_order_id: newOrderId,
+          p_idempotency_key: `idemp_${newOrderId}`
+        });
+
+        if (error) throw error;
+        pay(total);
+      }
+
+      // Save order to Supabase
+      await supabaseService.createOrder({
+        id: newOrderId,
+        user_id: profile.id,
+        store_id: selectedStore.id,
+        total_cents: Math.round(total * 100),
+        status: 'completed',
+        items: items.map(item => ({
+          cake_id: item.cakeId,
+          type: item.type,
+          quantity: item.quantity,
+          price_cents: Math.round((cakes.find(c => c.id === item.cakeId)?.[item.type === 'whole' ? 'priceWhole' : 'priceSlice'] || 0) * 100)
+        }))
       });
 
-      if (error) {
-        console.error('Supabase payment failed:', error);
-        alert('Payment failed. Please check your balance.');
-        return;
-      }
-
-      // Still update local state for the demo/fallback
-      const success = pay(total);
-      if (!success) return;
-    }
-
-    // Simulate Webhook
-    if (adminConfig.webhookUrl) {
-      try {
-        await fetch(adminConfig.webhookUrl, {
+      // Webhook
+      if (adminConfig.webhookUrl) {
+        fetch(adminConfig.webhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId: newOrderId,
-            items,
-            total,
-            customer: profile,
-            store: selectedStore,
-            timestamp: new Date().toISOString()
-          })
-        });
-      } catch (e) {
-        console.error('Webhook failed', e);
+          body: JSON.stringify({ orderId: newOrderId, items, total, customer: profile, store: selectedStore })
+        }).catch(e => console.error('Webhook failed', e));
       }
+      
+      addPoints(total);
+      clearCart();
+      setIsCartOpen(false);
+      setCurrentView('success');
+    } catch (error) {
+      console.error('Checkout failed:', error);
+      alert('Checkout failed. Please try again.');
     }
-    
-    addPoints(total);
-    clearCart();
-    setIsCartOpen(false);
-    setCurrentView('success');
   };
 
   const handleToggleStock = (cakeId: string, storeId: string) => {
@@ -175,18 +221,29 @@ export default function App() {
 
               {/* Category Menu */}
               <div className="flex gap-3 overflow-x-auto no-scrollbar py-2 -mx-4 px-4 sticky top-16 z-20 bg-black/80 backdrop-blur-xl">
-                {CATEGORIES.map(cat => (
+                <button
+                  onClick={() => setActiveCategory('All')}
+                  className={cn(
+                    "px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap",
+                    activeCategory === 'All' 
+                      ? "bg-white text-black shadow-xl scale-105" 
+                      : "glass text-white/40 hover:text-white"
+                  )}
+                >
+                  All
+                </button>
+                {categories.map(cat => (
                   <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
+                    key={cat.id}
+                    onClick={() => setActiveCategory(cat.name)}
                     className={cn(
                       "px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap",
-                      activeCategory === cat 
+                      activeCategory === cat.name 
                         ? "bg-white text-black shadow-xl scale-105" 
                         : "glass text-white/40 hover:text-white"
                     )}
                   >
-                    {cat}
+                    {cat.name}
                   </button>
                 ))}
               </div>
@@ -231,21 +288,6 @@ export default function App() {
             </motion.div>
           )}
 
-          {currentView === 'settings' && (
-            <motion.div
-              key="settings"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-            >
-              <SettingsView 
-                profile={profile}
-                onUpdateProfile={setProfile}
-                onLogout={() => setCurrentView('catalog')}
-              />
-            </motion.div>
-          )}
-
           {currentView === 'admin' && (
             <motion.div
               key="admin"
@@ -255,16 +297,20 @@ export default function App() {
             >
               <AdminView 
                 cakes={cakes}
+                categories={categories}
+                stores={stores}
                 coupons={coupons}
                 walletTiers={walletTiers}
                 config={adminConfig}
-                onUpdateCake={(updated) => setCakes(prev => prev.map(c => c.id === updated.id ? updated : c))}
+                profile={profile}
+                onUpdateCake={handleUpdateCake}
                 onUpdateCoupon={(updated) => setCoupons(prev => prev.map(c => c.id === updated.id ? updated : c))}
                 onDeleteCoupon={(id) => setCoupons(prev => prev.filter(c => c.id !== id))}
                 onAddCoupon={(newC) => setCoupons(prev => [...prev, newC])}
                 onUpdateWalletTier={(updated) => setWalletTiers(prev => prev.map(t => t.amount === updated.amount ? updated : t))}
                 onToggleStock={handleToggleStock}
                 onUpdateConfig={setAdminConfig}
+                onUpdateProfile={setProfile}
               />
             </motion.div>
           )}
@@ -286,8 +332,33 @@ export default function App() {
       </main>
 
       {currentView !== 'success' && (
-        <BottomNav currentView={currentView} onViewChange={setCurrentView} />
+        <BottomNav 
+          currentView={currentView} 
+          onViewChange={setCurrentView} 
+          profile={profile}
+          onProfileClick={() => setIsProfileOpen(true)}
+        />
       )}
+
+      <ProfileDrawer
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        profile={profile}
+        onLogout={() => {
+          // Reset to a default user or just alert
+          alert('Logged out');
+          setProfile({
+            id: 'user_guest',
+            name: 'Visitante',
+            email: 'guest@example.com',
+            address: '',
+            whatsapp: '',
+            points: 0,
+            loyalty_ratio: 1
+          });
+          setCurrentView('catalog');
+        }}
+      />
 
       <CartDrawer
         isOpen={isCartOpen}

@@ -69,11 +69,27 @@ export function Header({ selectedStore, onStoreChange, cartCount, onCartClick }:
         className="relative p-2 hover:bg-white/10 rounded-full transition-colors"
       >
         <ShoppingCart size={22} />
-        {cartCount > 0 && (
-          <span className="absolute top-0 right-0 bg-white text-black text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-            {cartCount}
-          </span>
-        )}
+        <AnimatePresence>
+          {cartCount > 0 && (
+            <motion.span
+              key="cart-badge"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+              className="absolute top-0 right-0 bg-white text-black text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center"
+            >
+              <motion.span
+                key={cartCount}
+                initial={{ y: -10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                className="absolute"
+              >
+                {cartCount}
+              </motion.span>
+            </motion.span>
+          )}
+        </AnimatePresence>
       </button>
     </header>
   );

@@ -1,7 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
-export function useWallet() {
-  const [balance, setBalance] = useState(0);
+export function useWallet(initialBalance: number = 0) {
+  const [balance, setBalance] = useState(initialBalance);
+
+  useEffect(() => {
+    setBalance(initialBalance);
+  }, [initialBalance]);
 
   const calculateBonus = (amount: number) => {
     if (amount >= 200) return amount * 0.15;
