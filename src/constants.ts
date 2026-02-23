@@ -1,10 +1,10 @@
 import { Cake, Store, Coupon, PaymentMethod, WalletTier } from './types';
 
 export const STORES: Store[] = [
-  { id: '1', name: 'Vó Alzira - Tijuca', address: 'Rua Conde de Bonfim, 123' },
-  { id: '2', name: 'Vó Alzira - Barra', address: 'Av. das Américas, 500' },
-  { id: '3', name: 'Vó Alzira - Centro', address: 'Rua do Ouvidor, 45' },
-  { id: '4', name: 'Vó Alzira - Copacabana', address: 'Av. N. Sra. de Copacabana, 800' },
+  { id: '1', name: 'Vó Alzira - Tijuca', address: 'Rua Conde de Bonfim, 123', slug: 'tijuca' },
+  { id: '2', name: 'Vó Alzira - Barra', address: 'Av. das Américas, 500', slug: 'barra' },
+  { id: '3', name: 'Vó Alzira - Centro', address: 'Rua do Ouvidor, 45', slug: 'centro' },
+  { id: '4', name: 'Vó Alzira - Copacabana', address: 'Av. N. Sra. de Copacabana, 800', slug: 'copacabana' },
 ];
 
 export const CATEGORIES = ['All', 'Classic', 'Premium', 'Special', 'Drinks', 'Ice Cream'];

@@ -25,7 +25,12 @@ import { supabaseService } from './services/supabaseService';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('catalog');
-  const [selectedStore, setSelectedStore] = useState<Store>(STATIC_STORES[0]);
+  const [selectedStore, setSelectedStore] = useState<Store>({
+    id: 'loja-teste-id',
+    name: 'Loja Teste',
+    address: 'Endereço de Teste',
+    slug: 'loja-teste'
+  });
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
@@ -33,7 +38,12 @@ export default function App() {
   // Admin Managed State
   const [cakes, setCakes] = useState<Cake[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [stores, setStores] = useState<Store[]>(STATIC_STORES);
+  const [stores, setStores] = useState<Store[]>([{
+    id: 'loja-teste-id',
+    name: 'Loja Teste',
+    address: 'Endereço de Teste',
+    slug: 'loja-teste'
+  }]);
   const [coupons, setCoupons] = useState<Coupon[]>(INITIAL_COUPONS);
   const [walletTiers, setWalletTiers] = useState<WalletTier[]>(INITIAL_WALLET_TIERS);
   const [paymentMethods] = useState(INITIAL_PAYMENT_METHODS);
@@ -50,11 +60,13 @@ export default function App() {
   });
 
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
+        setError(null);
         const [fetchedCakes, fetchedCategories, fetchedStores, fetchedProfile] = await Promise.all([
           supabaseService.getProducts(),
           supabaseService.getCategories(),
@@ -65,12 +77,18 @@ export default function App() {
         setCakes(fetchedCakes);
         setCategories(fetchedCategories);
         setProfile(fetchedProfile);
+
         if (fetchedStores.length > 0) {
           setStores(fetchedStores);
-          setSelectedStore(fetchedStores[0]);
+          const testStore = fetchedStores.find(s => 
+            s.name.includes('Teste') || s.slug?.includes('teste')
+          ) || fetchedStores[0];
+          
+          setSelectedStore(testStore);
         }
-      } catch (error) {
-        console.error('Error fetching data:', error);
+      } catch (err: any) {
+        console.error('Error fetching data:', err);
+        setError('Falha ao conectar com o banco de dados. Verifique suas credenciais Supabase.');
       } finally {
         setIsLoading(false);
       }
@@ -86,6 +104,16 @@ export default function App() {
     } catch (error) {
       console.error('Failed to update product:', error);
       alert('Failed to update product. Please try again.');
+    }
+  };
+
+  const handleCreateCake = async (newCake: Partial<Cake>) => {
+    try {
+      const created = await supabaseService.createProduct(newCake, stores.map(s => s.id));
+      setCakes(prev => [...prev, created]);
+    } catch (error) {
+      console.error('Failed to create product:', error);
+      alert('Failed to create product. Please try again.');
     }
   };
 
@@ -304,6 +332,7 @@ export default function App() {
                 config={adminConfig}
                 profile={profile}
                 onUpdateCake={handleUpdateCake}
+                onAddCake={handleCreateCake}
                 onUpdateCoupon={(updated) => setCoupons(prev => prev.map(c => c.id === updated.id ? updated : c))}
                 onDeleteCoupon={(id) => setCoupons(prev => prev.filter(c => c.id !== id))}
                 onAddCoupon={(newC) => setCoupons(prev => [...prev, newC])}

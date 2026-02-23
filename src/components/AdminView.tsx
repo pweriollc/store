@@ -30,6 +30,7 @@ interface AdminViewProps {
   config: AdminConfig;
   profile: UserProfile;
   onUpdateCake: (cake: Cake) => void;
+  onAddCake: (cake: Partial<Cake>) => void;
   onUpdateCoupon: (coupon: Coupon) => void;
   onDeleteCoupon: (id: string) => void;
   onAddCoupon: (coupon: Coupon) => void;
@@ -50,6 +51,7 @@ export function AdminView({
   config,
   profile,
   onUpdateCake, 
+  onAddCake,
   onUpdateCoupon, 
   onDeleteCoupon,
   onAddCoupon,
@@ -138,7 +140,21 @@ export function AdminView({
           >
             <div className="flex items-center justify-between px-2">
               <h3 className="font-semibold">Cake Inventory</h3>
-              <button className="p-2 bg-white text-black rounded-lg hover:bg-white/90">
+              <button 
+                onClick={() => setEditingCake({
+                  id: '',
+                  name: '',
+                  description: '',
+                  priceWhole: 0,
+                  priceSlice: 0,
+                  stockCount: 0,
+                  image: '',
+                  images: [],
+                  category_id: categories[0]?.id || '11111111-1111-1111-1111-111111111111',
+                  outOfStockStores: []
+                } as Cake)}
+                className="p-2 bg-white text-black rounded-lg hover:bg-white/90"
+              >
                 <Plus size={18} />
               </button>
             </div>
@@ -488,7 +504,15 @@ export function AdminView({
         onClose={() => setEditingCake(null)} 
         cake={editingCake} 
         stores={stores}
-        onSave={onUpdateCake} 
+        categories={categories}
+        onSave={(cake) => {
+          if (cake.id) {
+            onUpdateCake(cake);
+          } else {
+            onAddCake(cake);
+          }
+          setEditingCake(null);
+        }} 
       />
 
       <PromoEditor 

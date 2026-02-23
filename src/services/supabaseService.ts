@@ -5,6 +5,7 @@ export const supabaseService = {
   async getCategories(): Promise<Category[]> {
     const { data, error } = await supabase.from('categories').select('*');
     if (error) throw error;
+    console.log('Categorias do Banco:', data);
     return data;
   },
 
@@ -15,39 +16,92 @@ export const supabaseService = {
   },
 
   async getProducts(): Promise<Cake[]> {
-    const [productsRes, storesRes] = await Promise.all([
-      supabase.from('products').select('*, categories(name), product_images(image_url), inventory(store_id)'),
-      supabase.from('stores').select('id')
-    ]);
+    console.log('Iniciando busca global de produtos...');
+    // Fetching all products without store filter for testing
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, categories(name)');
     
-    if (productsRes.error) throw productsRes.error;
-    if (storesRes.error) throw storesRes.error;
+    if (error) {
+      console.error('Erro ao buscar produtos:', error);
+      throw error;
+    }
 
-    console.log('Supabase Products Fetch Result:', productsRes.data);
+    console.log('Total de produtos encontrados:', data?.length || 0);
+    console.log('Produtos do Banco (Raw):', data);
 
-    const allStoreIds = storesRes.data.map(s => s.id);
+    if (!data) return [];
 
-    return productsRes.data.map((p: any) => {
-      const availableStoreIds = p.inventory?.map((i: any) => i.store_id) || [];
-      const outOfStockStores = allStoreIds.filter(id => !availableStoreIds.includes(id));
+    return data.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description || '',
+      descriptionMarkdown: p.description_markdown || '',
+      priceWhole: (p.price_whole_cents || 0) / 100,
+      priceSlice: (p.price_slice_cents || 0) / 100,
+      salePriceWhole: p.sale_price_whole_cents ? p.sale_price_whole_cents / 100 : undefined,
+      salePriceSlice: p.sale_price_slice_cents ? p.sale_price_slice_cents / 100 : undefined,
+      stockCount: p.stock_count || 0,
+      image: p.image_url || 'https://picsum.photos/400/400',
+      images: [],
+      category_id: p.category_id,
+      category: p.categories?.name || 'Geral',
+      outOfStockStores: [] // Sem filtro por loja para teste
+    }));
+  },
+
+  async createProduct(cake: Partial<Cake>, allStoreIds: string[]): Promise<Cake> {
+    // 1. Insert basic product info
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .insert({
+        name: cake.name,
+        description: cake.description,
+        description_markdown: cake.descriptionMarkdown,
+        price_whole_cents: Math.round((cake.priceWhole || 0) * 100),
+        price_slice_cents: Math.round((cake.priceSlice || 0) * 100),
+        sale_price_whole_cents: cake.salePriceWhole ? Math.round(cake.salePriceWhole * 100) : null,
+        sale_price_slice_cents: cake.salePriceSlice ? Math.round(cake.salePriceSlice * 100) : null,
+        stock_count: cake.stockCount || 0,
+        image_url: cake.image || '',
+        category_id: cake.category_id || '11111111-1111-1111-1111-111111111111' // Default category
+      })
+      .select()
+      .single();
+
+    if (productError) throw productError;
+
+    // 2. Insert images
+    if (cake.images && cake.images.length > 0) {
+      const { error: insertImagesError } = await supabase
+        .from('product_images')
+        .insert(cake.images.map((url, index) => ({
+          product_id: product.id,
+          image_url: url,
+          position: index
+        })));
       
-      return {
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        descriptionMarkdown: p.description_markdown,
-        priceWhole: p.price_whole_cents / 100,
-        priceSlice: p.price_slice_cents / 100,
-        salePriceWhole: p.sale_price_whole_cents ? p.sale_price_whole_cents / 100 : undefined,
-        salePriceSlice: p.sale_price_slice_cents ? p.sale_price_slice_cents / 100 : undefined,
-        stockCount: p.stock_count || 0,
-        image: p.image_url,
-        images: p.product_images?.map((img: any) => img.image_url) || [],
-        category_id: p.category_id,
-        category: p.categories?.name,
-        outOfStockStores
-      };
-    });
+      if (insertImagesError) throw insertImagesError;
+    }
+
+    // 3. Update inventory (Availability per store)
+    const availableStoreIds = allStoreIds.filter(id => !cake.outOfStockStores?.includes(id));
+    
+    if (availableStoreIds.length > 0) {
+      const { error: insertInventoryError } = await supabase
+        .from('inventory')
+        .insert(availableStoreIds.map(storeId => ({
+          product_id: product.id,
+          store_id: storeId
+        })));
+      
+      if (insertInventoryError) throw insertInventoryError;
+    }
+
+    return {
+      ...cake,
+      id: product.id,
+    } as Cake;
   },
 
   async updateProduct(cake: Cake, allStoreIds: string[]) {

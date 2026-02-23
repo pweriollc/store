@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cake, Store } from '../types';
+import { Cake, Store, Category } from '../types';
 import { BottomDrawer } from './BottomDrawer';
 import { Plus, Trash2, GripVertical, Store as StoreIcon } from 'lucide-react';
 import { cn } from '../utils';
@@ -10,17 +10,18 @@ interface CakeEditorProps {
   onClose: () => void;
   cake: Cake | null;
   stores: Store[];
+  categories: Category[];
   onSave: (cake: Cake) => void;
 }
 
-export function CakeEditor({ isOpen, onClose, cake, stores, onSave }: CakeEditorProps) {
+export function CakeEditor({ isOpen, onClose, cake, stores, categories, onSave }: CakeEditorProps) {
   const [formData, setFormData] = useState<Partial<Cake>>({});
 
   useEffect(() => {
     if (cake) {
       setFormData({
         ...cake,
-        images: cake.images || [cake.image]
+        images: cake.images || (cake.image ? [cake.image] : [])
       });
     }
   }, [cake]);
@@ -37,7 +38,7 @@ export function CakeEditor({ isOpen, onClose, cake, stores, onSave }: CakeEditor
   };
 
   const handleSave = () => {
-    if (cake && formData.name) {
+    if (formData.name) {
       onSave({ ...cake, ...formData } as Cake);
       onClose();
     }
@@ -92,6 +93,19 @@ export function CakeEditor({ isOpen, onClose, cake, stores, onSave }: CakeEditor
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full glass bg-white/5 rounded-2xl py-4 px-6 text-sm focus:outline-none focus:ring-2 ring-white/20"
             />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-white/20 uppercase tracking-widest px-1">Category</label>
+            <select
+              value={formData.category_id || ''}
+              onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+              className="w-full glass bg-white/5 rounded-2xl py-4 px-6 text-sm focus:outline-none focus:ring-2 ring-white/20 appearance-none"
+            >
+              <option value="" disabled>Select Category</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-white/20 uppercase tracking-widest px-1">Short Description</label>

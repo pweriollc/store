@@ -52,6 +52,7 @@ export interface Store {
   id: string;
   name: string;
   address: string;
+  slug: string;
 }
 
 export interface Coupon {
