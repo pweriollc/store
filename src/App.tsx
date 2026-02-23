@@ -67,25 +67,27 @@ export default function App() {
       try {
         setIsLoading(true);
         setError(null);
-        const [fetchedCakes, fetchedCategories, fetchedStores, fetchedProfile] = await Promise.all([
-          supabaseService.getProducts(),
-          supabaseService.getCategories(),
-          supabaseService.getStores(),
-          supabaseService.getProfile('6903ddff-f8b5-4aaa-8da3-8fcba142b27d') // Using the admin ID from request
-        ]);
         
-        setCakes(fetchedCakes);
-        setCategories(fetchedCategories);
-        setProfile(fetchedProfile);
-
+        // Fetch stores first as they are critical
+        const fetchedStores = await supabaseService.getStores().catch(() => []);
         if (fetchedStores.length > 0) {
           setStores(fetchedStores);
           const testStore = fetchedStores.find(s => 
             s.name.includes('Teste') || s.slug?.includes('teste')
           ) || fetchedStores[0];
-          
           setSelectedStore(testStore);
         }
+
+        const [fetchedCakes, fetchedCategories, fetchedProfile] = await Promise.all([
+          supabaseService.getProducts().catch(() => []),
+          supabaseService.getCategories().catch(() => []),
+          supabaseService.getProfile('6903ddff-f8b5-4aaa-8da3-8fcba142b27d').catch(() => profile)
+        ]);
+        
+        setCakes(fetchedCakes);
+        setCategories(fetchedCategories);
+        if (fetchedProfile) setProfile(fetchedProfile);
+
       } catch (err: any) {
         console.error('Error fetching data:', err);
         setError('Falha ao conectar com o banco de dados. Verifique suas credenciais Supabase.');
@@ -233,7 +235,31 @@ export default function App() {
       />
 
       <main className="pt-20 px-4 max-w-lg mx-auto">
-        <AnimatePresence mode="wait">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+            <div className="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+            <p className="text-white/40 text-sm animate-pulse">Carregando delícias...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 text-center px-4">
+            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+              <span className="text-red-500 text-2xl">!</span>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold">Ops! Algo deu errado</h2>
+              <p className="text-white/50 text-sm max-w-xs mx-auto">
+                {error}
+              </p>
+            </div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-8 py-3 bg-white text-black rounded-full text-sm font-bold uppercase tracking-widest hover:scale-105 transition-transform"
+            >
+              Tentar Novamente
+            </button>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
           {currentView === 'catalog' && (
             <motion.div
               key="catalog"
@@ -358,6 +384,7 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+        )}
       </main>
 
       {currentView !== 'success' && (
