@@ -354,7 +354,8 @@ export default function App() {
             address: '',
             whatsapp: '',
             points: 0,
-            loyalty_ratio: 1
+            loyalty_ratio: 1,
+            wallet_balance_cents: 0
           });
           setCurrentView('catalog');
         }}

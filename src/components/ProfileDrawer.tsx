@@ -1,7 +1,7 @@
 import React from 'react';
 import { UserProfile } from '../types';
 import { BottomDrawer } from './BottomDrawer';
-import { LogOut, User, Mail, MapPin, Phone, Award } from 'lucide-react';
+import { LogOut, User, Mail, MapPin, Phone, Award, Wallet } from 'lucide-react';
 import { formatCurrency } from '../utils';
 
 interface ProfileDrawerProps {
@@ -26,13 +26,25 @@ export function ProfileDrawer({ isOpen, onClose, profile, onLogout }: ProfileDra
         </div>
 
         <div className="grid gap-4">
-          <div className="glass p-4 rounded-2xl flex items-center gap-4">
-            <div className="bg-white/10 p-2 rounded-xl">
-              <Award className="text-white" size={20} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="glass p-4 rounded-2xl flex items-center gap-4">
+              <div className="bg-white/10 p-2 rounded-xl">
+                <Award className="text-white" size={20} />
+              </div>
+              <div>
+                <div className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Pontos</div>
+                <div className="text-lg font-bold">{profile.points}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Pontos Fidelidade</div>
-              <div className="text-lg font-bold">{profile.points} Pontos</div>
+
+            <div className="glass p-4 rounded-2xl flex items-center gap-4">
+              <div className="bg-white/10 p-2 rounded-xl">
+                <Wallet className="text-white" size={20} />
+              </div>
+              <div>
+                <div className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Saldo</div>
+                <div className="text-lg font-bold">{formatCurrency(profile.wallet_balance_cents / 100)}</div>
+              </div>
             </div>
           </div>
 

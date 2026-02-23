@@ -23,6 +23,8 @@ export const supabaseService = {
     if (productsRes.error) throw productsRes.error;
     if (storesRes.error) throw storesRes.error;
 
+    console.log('Supabase Products Fetch Result:', productsRes.data);
+
     const allStoreIds = storesRes.data.map(s => s.id);
 
     return productsRes.data.map((p: any) => {

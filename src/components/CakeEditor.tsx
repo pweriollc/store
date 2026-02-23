@@ -3,6 +3,7 @@ import { Cake, Store } from '../types';
 import { BottomDrawer } from './BottomDrawer';
 import { Plus, Trash2, GripVertical, Store as StoreIcon } from 'lucide-react';
 import { cn } from '../utils';
+import { supabaseService } from '../services/supabaseService';
 
 interface CakeEditorProps {
   isOpen: boolean;
@@ -42,23 +43,40 @@ export function CakeEditor({ isOpen, onClose, cake, stores, onSave }: CakeEditor
     }
   };
 
-  const addImage = () => {
-    const images = [...(formData.images || [])];
-    if (images.length < 5) {
-      images.push('https://picsum.photos/seed/new/600/600');
-      setFormData({ ...formData, images });
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const url = await supabaseService.uploadImage(file);
+      const images = [...(formData.images || [])];
+      if (images.length < 5) {
+        images.push(url);
+        setFormData({ 
+          ...formData, 
+          images,
+          image: formData.image || url // Set as primary if none exists
+        });
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Failed to upload image');
     }
   };
 
   const removeImage = (index: number) => {
     const images = (formData.images || []).filter((_, i) => i !== index);
-    setFormData({ ...formData, images });
+    const newPrimary = index === 0 ? (images[0] || '') : formData.image;
+    setFormData({ ...formData, images, image: newPrimary });
   };
 
-  const updateImage = (index: number, url: string) => {
+  const moveImage = (index: number, direction: 'up' | 'down') => {
     const images = [...(formData.images || [])];
-    images[index] = url;
-    setFormData({ ...formData, images, image: index === 0 ? url : formData.image });
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= images.length) return;
+    
+    [images[index], images[newIndex]] = [images[newIndex], images[index]];
+    setFormData({ ...formData, images, image: images[0] });
   };
 
   return (
@@ -186,28 +204,44 @@ export function CakeEditor({ isOpen, onClose, cake, stores, onSave }: CakeEditor
         <div className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-xs font-bold text-white/40 uppercase tracking-widest">Gallery (Max 5)</h3>
-            <button 
-              onClick={addImage}
-              disabled={(formData.images?.length || 0) >= 5}
-              className="p-2 bg-white/10 rounded-lg hover:bg-white/20 disabled:opacity-30"
-            >
+            <label className="p-2 bg-white/10 rounded-lg hover:bg-white/20 cursor-pointer transition-colors">
               <Plus size={16} />
-            </button>
+              <input 
+                type="file" 
+                className="hidden" 
+                accept="image/*"
+                onChange={handleImageUpload}
+                disabled={(formData.images?.length || 0) >= 5}
+              />
+            </label>
           </div>
           
           <div className="space-y-3">
             {formData.images?.map((url, index) => (
-              <div key={index} className="flex items-center gap-3 glass p-3 rounded-2xl">
-                <div className="cursor-grab active:cursor-grabbing text-white/20">
-                  <GripVertical size={20} />
+              <div key={index} className="flex items-center gap-3 glass p-3 rounded-2xl group">
+                <div className="flex flex-col gap-1 text-white/20">
+                  <button 
+                    onClick={() => moveImage(index, 'up')}
+                    disabled={index === 0}
+                    className="hover:text-white disabled:opacity-0"
+                  >
+                    <GripVertical size={16} className="rotate-180" />
+                  </button>
+                  <button 
+                    onClick={() => moveImage(index, 'down')}
+                    disabled={index === (formData.images?.length || 0) - 1}
+                    className="hover:text-white disabled:opacity-0"
+                  >
+                    <GripVertical size={16} />
+                  </button>
                 </div>
                 <img src={url} className="w-12 h-12 rounded-xl object-cover" />
-                <input
-                  type="text"
-                  value={url}
-                  onChange={(e) => updateImage(index, e.target.value)}
-                  className="flex-1 bg-transparent text-xs focus:outline-none"
-                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] text-white/40 truncate">{url}</div>
+                  {index === 0 && (
+                    <div className="text-[8px] text-emerald-400 font-bold uppercase tracking-widest mt-0.5">Primary Image</div>
+                  )}
+                </div>
                 <button 
                   onClick={() => removeImage(index)}
                   className="p-2 text-red-400/60 hover:text-red-400"
